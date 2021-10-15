@@ -1,0 +1,386 @@
+METHOD RK4
+
+{A irinotecan PBPK model, Model written by Gabriel Tao, on 072521, University of Florida}
+
+STARTTIME= 0
+STOPTIME = 24
+DT = 0.001
+DTOUT = 0.1
+
+; Physiological parameters
+; Blood flow rates
+QCC = 1.224 ; Cardiac output (L/h/kg) (Gjedde et al., 1980)
+QLC = 0.02 ; Fraction of blood flow to the liver (Gjedde et al., 1980)
+QKC = 0.09 ; Fraction of blood flow to the kidneys (Gjedde et al., 1980)
+QGC = 0.141 ; Fraction of blood flow to the gut (Gjedde et al., 1980)
+
+; Tissue volumes
+BW = 0.02 ; Body weight (kg) 
+VLC = 0.0549 ; Fractional liver tissue (Hudachek and Gustafson, 2013)
+VKC = 0.0167 ; Fractional kidney tissue (Hudachek and Gustafson, 2013)
+VGC = 0.0422 ; Fractional gut tissue (Hudachek and Gustafson, 2013)
+VbloodC = 0.049 ; Blood volume, fraction of BW (Hudachek and Gustafson, 2013)
+
+; Cardiac output and blood flows to tissues (L/h)
+QC = QCC*BW ; Cardiac output
+QL = QLC*QC ; Liver
+QK = QKC*QC ; Kidney
+QG = QGC*QC ; Gut
+QR = 0.649*QC-QK-QL-QG ; Richly perfused tissues (Hudachek and GUStafson, 2013)
+QS = 0.351*QC ; Slowly perfused tissues (Hudachek and GUStafson, 2013)
+
+; Tissue volumes (L)
+VL = VLC*BW ; Liver
+VK = VKC*BW ; Kidney
+VG = VGC*BW ; Gut
+Vblood = VbloodC*BW ; Blood
+VR = 0.18*BW-VL-VK-VG ; Richly perfused tissues
+VS = 0.771 *BW ; Slowly perfused tissues
+
+; Mass Transfer Parameters (Chemical-specific parameters)
+MW = 586.678; g/mol, irinotecan (IRI)
+MW1 = 392.404; g/mol, SN-38
+MW2 = 568.5; g/mol, SN-38G
+
+; Partition coefficients of IRI (PC, tissue:plasma)
+PL = 0.934 ; Liver:plasma PC (Asami et al., 2017)
+PK = 1.290 ; Kidney:plasma PC (Asami et al., 2017)
+PG = 1.597 ; Gut:plasma PC (Asami et al., 2017)
+PR = 0.742 ; Richly perfused tissues:plasma PC (Asami et al., 2017)
+PS = 0.272 ; Slowly perfused tissues:plasma PC (Asami et al., 2017)
+
+; Partition coefficients of SN-38 (PC, tissue:plasma)
+PL1 = 0.724; Liver:plasma PC (Asami et al., 2017)
+PK1 = 0.723 ; Kidney:plasma PC (Asami et al., 2017)
+PG1 = 0.579 ; Gut:plasma PC (Asami et al., 2017)
+PR1 = 1.082 ; Richly perfused tissues:plasma PC (Asami et al., 2017)
+PS1 = 0.723 ; Slowly perfused tissues:plasma PC (Asami et al., 2017)
+
+; Partition coefficients of SN-38G (PC, tissue:plasma)
+PL2 = 0.888 ; Liver:plasma PC (Asami et al., 2017)
+PK2 = 0.946 ; Kidney:plasma PC (Asami et al., 2017)
+PG2 = 0.631 ; Gut:plasma PC (Asami et al., 2017)
+PR2 = 0.647 ; Richly perfused tissues:plasma PC (Asami et al., 2017)
+PS2 = 0.378 ; Slowly perfused tissues:plasma PC (Asami et al., 2017)
+
+; Clearance rate constant (L/h/kg)
+CLurineC = 1.343 ; (Yoshida et al., 2013) 
+CLCESC = 13.95 ; (Slatter et al., 1997, Khanna et al., 2000)
+CLbileC = 0.235 ; (Yoshida et al., 2013)
+CLurineC1 = 0.3253 ; (Yoshida et al., 2013)
+CLbileC1 = 1.120 ; (Yoshida et al., 2013)
+CLurineC2 = 4.29 ; (Yoshida et al., 2013)
+CLbileC2 = 1.569 ; (Yoshida et al., 2013)
+
+; Clearance rate (L/h)
+CLurine = CLurineC * BW; Renal clearance of IRI
+CLCES = CLCESC * BW; CES metabolism of IRI
+CLbile = CLbileC * BW; Bile excretion of IRI
+CLurine1 = CLurineC1 * BW; Renal clearance of SN-38
+CLbile1 = CLbileC1 * BW; Bile excretion of SN-38
+CLurine2 = CLurineC2 * BW; Renal clearance of SN-38G
+CLbile2 = CLbileC2 * BW; Bile excretion of SN-38G
+
+; Michaelis Menten Metabolism 
+KmUGT = 14.08; Michaelis constant of GUS (mg/L) (Cai et al., 2010, Abass et al., 2014)
+VmaxUGTC = 97.48; Vmax constant of UGT derived from IVIVE (mg/h/kg) (Cai et al., 2010, Abass et al., 2014)
+KmGUS = 204.66; Michaelis constant of GUS (mg/L) (Roberts et al., 2013; Bhatt et al., 2020)
+VmaxGUSC = 245.53; Vmax constant of GUS derived from IVIVE (mg/h/kg) (Roberts et al., 2013; Bhatt et al., 2020)
+VmaxUGT= VmaxUGTC * VL; Vmax of UGT metabolizing SN38 (mg/h)
+VmaxGUS= VmaxGUSC *VG; Vmax of GUS metabolizing SN38G  (mg/h)
+
+; Transition rate constant (h-1)
+Kbile = 1.031 ; bile transition rate constant of IRI (Yoshida et al., 2013)
+Kfecal = 0.011; fecal transition rate constant of IRI (Yoshida et al., 2013)
+Kbile1 = 1.048 ; bile transition rate constant of SN-38 (Yoshida et al., 2013)
+Kfecal1 = 0.013 ; fecal transition rate constant of SN-38 (Yoshida et al., 2013)
+Kbile2 = 0.054 ; bile transition rate constant of SN-38G (Yoshida et al., 2013)
+Kfecal2 = 0.09 ; fecal transition rate constant of SN-38G (Yoshida et al., 2013)
+	
+; Parameters for exposure scenario (mg/kg)
+PDOSEiv = 50 ; IV dose
+PDOSEim= 0; IM dose
+	
+; Dosing
+DOSEiv = PDOSEiv*BW ; (mg)
+DOSEim=PDOSEim*BW ; (mg)
+
+; IV infusion rate constants
+Timeiv = 0.01 ; IV injection/infusion time (h)
+
+;IM injection rate constant
+Kim = 0.30; IM absoprtion rate constant (h-1)
+
+; IRI iv injection to the venous
+IVR = DOSEiv/Timeiv
+Riv = IVR*(1.-step(1,Timeiv))
+d/dt(Aiv) = Riv
+init Aiv = 0
+
+; IRI im injection to the venous
+Rim = Kim * Aimsite
+d/dt(Aab) = Rim
+init Aab = 0
+Rsite = -Rim
+d/dt(Aimsite) = Rsite
+init Aimsite = DOSEim
+
+;******************************************************************************
+; Submodel of IRI
+; Urinary excretion of IRI
+Rurine = CLurine*CVK
+d/dt(Aurine) = Rurine
+init Aurine = 0
+
+; Liver CES metabolism of IRI
+RCES = CLCES*CVL
+d/dt(ACES) = RCES
+init ACES = 0
+
+; Gallbladder residue of IRI
+Rbile = Rbilein - Rbileout
+Rbilein = CLbile * CVL
+Rbileout =  Kbile * Abile
+d/dt(Abile) = Rbile
+init Abile = 0
+
+; Feces elimation of IRI
+Rfecal = Kfecal*AG
+d/dt(Afecal) = Rfecal
+init Afecal = 0
+
+; IRI in blood compartment
+CV = ((QL*CVL + QK*CVK + QR*CVR + QS*CVS + Riv +Rim)/QC)
+RA = QC*(CV-CA)
+d/dt(AA) = RA
+init AA = 0
+CA = AA/Vblood
+d/dt(AUCA) = CA
+init AUCA = 0
+
+; IRI in liver compartment
+RL = QL*(CA-CVL) + QG*CVG - Rbilein - RCES
+d/dt(AL) = RL
+init AL = 0
+CL = AL/VL
+CVL = AL/(VL*PL)
+d/dt(AUCL) = CL
+init AUCL = 0
+
+; IRI in kidney compartment
+RK = QK*(CA-CVK)-Rurine
+d/dt(AK) = RK
+init AK = 0
+CK = AK/VK
+CVK = AK/(VK*PK)
+d/dt(AUCK) = CK
+init AUCK = 0
+
+; IRI in gut compartment
+RG = QG*(CA-CVG) + Rbileout - Rfecal 
+d/dt(AG) = RG
+init AG = 0
+CG = AG/VG
+CVG = AG/(VG*PG)
+d/dt(AUCG) = CG
+init AUCG = 0
+
+; IRI in richly perfused tissue compartment
+RR = QR*(CA-CVR)
+d/dt(AR) = RR
+init AR = 0
+CR = AR/VR
+CVR = AR/(VR*PR)
+
+; IRI in slowly perfused tissue compartment
+RS = QS*(CA-CVS)
+d/dt(AS) = RS
+init AS = 0
+CS = AS/VS
+CVS = AS/(VS*PS)
+
+; Mass balance
+Qbal = QC-QL-QK-QG-QR-QS
+Tmass = AA+AL+AK+AG+AR+AS+Abile+Aurine+ACES+Afecal
+Bal = Aiv+Aab -Tmass
+
+; *****************************************************************************
+; Submodel of SN-38
+; Urinary excretion of SN-38
+Rurine1 = CLurine1*CVK1
+d/dt(Aurine1) = Rurine1
+init Aurine1 = 0
+
+; Liver CES metabolism to produce SN-38
+RCES1 = RCES*(MW1/MW)
+d/dt(ACES1) = RCES1
+init ACES1 = 0
+
+; Liver UGT metabolism
+RUGT1L =VmaxUGT*CL1/(CL1+KmUGT)
+d/dt(AUGT1L) = RUGT1L
+init AUGT1L = 0
+
+;Gut UGT metabolism
+RUGT1G = VmaxUGT*CG1/(CG1+KmUGT)
+d/dt(AUGT1G) = RUGT1G
+init AUGT1G = 0
+
+; Gallbladder residue of SN-38
+Rbile1 = Rbilein1 - Rbileout1
+Rbilein1 = CLbile1 * CVL1
+Rbileout1 =  Kbile1 * Abile1
+d/dt(Abile1) = Rbile1
+init Abile1 = 0
+
+; GUS metabolism to produce SN-38
+RGUS1 = RGUS2*(MW1/MW2)
+d/dt(AGUS1) = RGUS1
+init AGUS1 = 0
+
+; Feces elimation of SN-38
+Rfecal1 = Kfecal1 *AG1
+d/dt(Afecal1) = Rfecal1
+init Afecal1 = 0
+
+; SN-38 in blood compartment
+CV1 = ((QL*CVL1 + QK*CVK1 + QR*CVR1 + QS*CVS1) / QC)
+RA1 = QC*(CV1-CA1)
+d/dt(AA1) = RA1
+init AA1 = 0
+CA1 = AA1/Vblood
+d/dt(AUCA1) = CA1
+init AUCA1 = 0
+
+; SN-38 in liver compartment
+RL1 = QL*(CA1 - CVL1) + RCES1+ QG*CVG1 - Rbilein1 - RUGT1L
+d/dt(AL1) = RL1
+init AL1 = 0
+CL1= AL1/VL
+CVL1 = AL1/(VL*PL1)
+d/dt(AUCL1) = CL1
+init AUCL1 = 0
+
+; SN-38 in kidney compartment
+RK1 = QK*(CA1-CVK1) - Rurine1
+d/dt(AK1) = RK1
+init AK1 = 0
+CK1 = AK1/VK
+CVK1 = AK1/(VK*PK1)
+d/dt(AUCK1) = CK1
+init AUCK1 = 0
+
+; SN-38 in gut compartment
+RG1 = QG*(CA1-CVG1) + Rbileout1 - Rfecal1  - RUGT1G + RGUS1
+d/dt(AG1) = RG1
+init AG1 = 0
+CG1 = AG1/VG
+CVG1 = AG1/(VG*PG1)
+d/dt(AUCG1) = CG1
+init AUCG1 = 0
+
+; SN-38 in richly perfused tissue compartment
+RR1 = QR*(CA1-CVR1)
+d/dt(AR1) = RR1
+init AR1 = 0
+CR1 = AR1/VR
+CVR1 = AR1/(VR*PR1)
+
+; SN-38 in slowly perfused tissue compartment
+RS1 = QS*(CA1-CVS1)
+d/dt(AS1) = RS1
+init AS1 = 0
+CS1 = AS1/VS
+CVS1 = AS1/(VS*PS1)
+
+; Mass balance
+Tmass1 = AA1+AL1+AK1+AG1+AR1+AS1+Abile1+Aurine1+Afecal1+AUGT1L+AUGT1G
+Bal1 = ACES1+AGUS1-Tmass1
+
+; *****************************************************************************
+; Submodel of SN-38G
+; Urinary excretion of SN-38G
+Rurine2 = CLurine2*CVK2
+d/dt(Aurine2) = Rurine2
+init Aurine2 = 0
+
+; Liver UGT metabolism to produce SN-38G
+RUGT2L = RUGT1L*(MW2/MW1)
+d/dt (AUGT2L) = RUGT2L
+init AUGT2L = 0
+
+; Gut UGT metabolism to produce SN-38G
+RUGT2G = RUGT1G*(MW2/MW1)
+d/dt(AUGT2G) = RUGT2G
+init AUGT2G = 0
+
+; Gallbladder residue of SN-38G
+Rbile2 = Rbilein2 - Rbileout2
+Rbilein2 = CLbile2 * CVL2
+Rbileout2 =  Kbile2 * Abile2
+d/dt(Abile2) = Rbile2
+init Abile2 = 0
+
+; GUS metabolism of SN-38G
+RGUS2 = VmaxGUS *CG2/(CG2+KmGUS)
+d/dt(AGUS2) = RGUS2
+init AGUS2 = 0
+
+; Feces elimation of SN-38G
+Rfecal2 = Kfecal2 *AG2
+d/dt(Afecal2) = Rfecal2
+init Afecal2 = 0
+
+; SN-38G in blood compartment
+CV2 = ((QL*CVL2 + QK*CVK2 + QR*CVR2 + QS*CVS2) / QC)
+RA2 = QC*(CV2-CA2)
+d/dt(AA2) = RA2
+init AA2 = 0
+CA2 = AA2/Vblood
+d/dt(AUCA2) = CA2
+init AUCA2 = 0
+
+; SN-38G in liver compartment
+RL2 = QL*(CA2 - CVL2) + RUGT2L +  QG*CVG2 - Rbilein2
+d/dt(AL2) = RL2
+init AL2 = 0
+CL2= AL2/VL
+CVL2 = AL2/(VL*PL2)
+d/dt(AUCL2) = CL2
+init AUCL2 = 0
+
+; SN-38G in kidney compartment
+RK2 = QK*(CA2-CVK2) - Rurine2
+d/dt(AK2) = RK2
+init AK2 = 0
+CK2 = AK2/VK
+CVK2 = AK2/(VK*PK2)
+d/dt(AUCK2) = CK2
+init AUCK2 = 0
+
+; SN-38G in gut compartment
+RG2 = QG*(CA2-CVG2) + Rbileout2 + RUGT2G - Rfecal2 - RGUS2
+d/dt(AG2) = RG2
+init AG2 = 0
+CG2 = AG2/VG
+CVG2 = AG2/(VG*PG2)
+d/dt(AUCG2) = CG2
+init AUCG2 = 0
+
+; SN-38G in richly perfused tissue compartment
+RR2 = QR*(CA2-CVR2)
+d/dt(AR2) = RR2
+init AR2 = 0
+CR2 = AR2/VR
+CVR2 = AR2/(VR*PR2)
+
+; SN-38G in slowly perfused tissue compartment
+RS2 = QS*(CA2-CVS2)
+d/dt(AS2) = RS2
+init AS2 = 0
+CS2 = AS2/VS
+CVS2 = AS2/(VS*PS2)
+
+; Mass balance
+Tmass2 = AA2+AL2+AK2+AG2+AR2+AS2+Abile2+Aurine2+Afecal2+AGUS2
+Bal2 = AUGT2L+AUGT2G -Tmass2
